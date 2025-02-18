@@ -1,0 +1,213 @@
+---
+title: "R Notebook"
+output:
+  pdf_document: default
+  html_notebook: default
+---
+
+
+
+```{r}
+library(tidyverse)
+```
+
+
+```{r}
+transacoes_milhas <- read_csv("transacoes_milhas.csv", show_col_types = FALSE)
+```
+```{r}
+head(transacoes_milhas)
+```
+```{r}
+clientes <- read_csv("clientes.csv", show_col_types = FALSE)
+transacoes_passagens <- read_csv("transacoes_passagens.csv", show_col_types = FALSE)
+head(clientes)
+head(transacoes_passagens)
+```
+```{r}
+transacoes_milhas %>% glimpse()
+```
+```{r}
+clientes %>% glimpse()
+```
+
+```{r}
+transacoes_passagens %>% glimpse()
+```
+```{r}
+transacoes_passagens <- transacoes_passagens %>% select(id_cliente, data_transacao, milhas_utilizadas, valor_pago)
+```
+
+```{r}
+transacoes_passagens %>% glimpse()
+```
+
+```{r}
+transacoes_milhas <- transacoes_milhas %>% filter(data_venda_milhas >= "2022-01-01" & data_venda_milhas <= "2022-12-31")
+transacoes_milhas %>% glimpse()
+```
+```{r}
+transacoes_passagens <- transacoes_passagens %>% filter(data_transacao >= "2022-01-01" & data_transacao <= "2022-12-31")
+transacoes_passagens %>% glimpse()
+```
+```{r}
+transacoes_passagens <- transacoes_passagens %>% mutate(custo_por_milha = valor_pago / milhas_utilizadas)
+transacoes_passagens %>% glimpse()
+```
+```{r}
+media_milhas <- transacoes_passagens %>% group_by(id_cliente) %>% summarise(media_milhas = mean(milhas_utilizadas))
+media_milhas %>% head()
+```
+```{r}
+head(transacoes_passagens)
+transacoes_passagens <- transacoes_passagens %>% arrange(data_transacao)
+head(transacoes_passagens)
+```
+```{r}
+head(transacoes_milhas)
+transacoes_milhas <- transacoes_milhas %>% arrange(data_venda_milhas)
+head(transacoes_milhas)
+```
+```{r}
+transacoes_passagens <- transacoes_passagens %>% left_join(clientes, by= "id_cliente")
+```
+
+```{r}
+head(transacoes_passagens)
+```
+
+```{r}
+transacoes_passagens <- transacoes_passagens %>% rename(
+  #Data_Compra_Passagem = data_transacao,
+  Milhas_Utilizadas = milhas_utilizadas,
+  Valor_Pago = valor_pago,
+  Custo_Por_Milha = custo_por_milha,
+  Data_Nascimento = data_nascimento,
+  Status_Fidelidade = status_fidelidade,
+  Milhas_Acumuladas = milhas_acumuladas,
+  Gasto_Total = gasto_total
+) 
+head(transacoes_passagens)
+```
+```{r}
+transacoes_passagens %>% count(id_cliente) %>% rename(Total_Compras = n) %>% arrange(desc(Total_Compras)) %>% head()
+```
+
+```{r}
+dados_milhas <- transacoes_passagens %>% select(id_cliente, Milhas_Utilizadas)
+```
+
+```{r}
+total_milhas_por_cliente <- dados_milhas %>% group_by(id_cliente) %>% summarise(total_milhas = sum(Milhas_Utilizadas))
+total_milhas_por_cliente %>% head()
+```
+```{r}
+total_milhas_por_cliente %>% arrange(desc(total_milhas)) %>% head()
+```
+
+
+```{r}
+# Categorização por milhas utilizadas, baixo(<2000), medio(2000< <5000) e alto(5000+)
+transacoes_passagens <- transacoes_passagens %>% mutate(
+  categoria_cliente = case_when(
+    Milhas_Utilizadas < 2000 ~ "Baixo",
+    Milhas_Utilizadas < 5000 ~ "Médio",
+    TRUE ~ "Alto"
+  )
+)
+```
+
+```{r}
+head(transacoes_passagens)
+```
+
+
+```{r}
+# Entendendo o funcionamento do cliente, se ele esta usando mais milhas e a perspectiva para o futuro
+transacoes_passagens <- transacoes_passagens %>% 
+  arrange(id_cliente, data_transacao)%>%
+  group_by(id_cliente) %>%
+  mutate(
+    diferenca_milhas_usadas = Milhas_Utilizadas - lag(Milhas_Utilizadas),
+    valor_futuro = lead(Milhas_Utilizadas)
+  )%>%
+  ungroup()
+
+head(transacoes_passagens)
+
+
+
+
+```
+
+
+```{r}
+any(is.na(transacoes_passagens))
+```
+
+```{r}
+sum(is.na(transacoes_passagens))
+```
+```{r}
+num_clientes <- transacoes_passagens %>% summarise(num_clientes = n_distinct(id_cliente))
+num_clientes
+```
+
+```{r}
+transacoes_passagens <- transacoes_passagens %>% mutate(
+  diferenca_milhas_usadas = coalesce(diferenca_milhas_usadas, 0),
+  valor_futuro = coalesce(valor_futuro, 0)
+)
+```
+
+
+```{r}
+transacoes_passagens %>% arrange(desc(diferenca_milhas_usadas)) %>% head(10)
+```
+
+```{r}
+transacoes_passagens <- transacoes_passagens %>% 
+  mutate(categoria_cliente = 
+    recode(categoria_cliente,
+          "Baixo" = "Iniciante",
+          "Médio" = "Intermediário",
+          "Alto" = "Avancado"
+  )
+)
+head(transacoes_passagens)
+```
+
+```{r}
+transacoes_passagens <- transacoes_passagens %>% 
+  mutate(Alto = NULL)
+head(transacoes_passagens)
+```
+
+```{r}
+transacoes_passagens %>% select(id_cliente, Milhas_Utilizadas, Milhas_Acumuladas)%>% head()
+```
+
+```{r}
+df_long <- transacoes_passagens %>% 
+  pivot_longer(
+    cols = starts_with("Milhas"),
+    names_to = "tipo_milhas",
+    values_to = "quantidade"
+  ) %>%
+  select(id_cliente, tipo_milhas, quantidade)
+
+
+```
+```{r}
+head(df_long)
+```
+```{r}
+df_long %>% 
+  group_by(id_cliente, tipo_milhas) %>%
+  summarise(
+    media = mean(quantidade),
+    mediana = median(quantidade),
+    desvio_padrao = sd(quantidade)
+  )
+```
+
